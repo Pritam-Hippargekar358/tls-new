@@ -1,0 +1,276 @@
+Challenges in Concurrent Programming
+................................................
+Race Conditions: Occur when multiple threads access shared data simultaneously, leading to unpredictable results.
+Deadlocks: Happen when two or more threads are waiting indefinitely for each other to release resources.
+Thread Starvation: Arises when threads are perpetually denied access to resources, preventing them from making progress.
+
+Fairness of Locks
+Fairness in the context of locks refers to the order in which threads acquire a lock.
+A fair lock ensures that threads acquire the lock in the order they requested it,
+preventing thread starvation. With a fair lock, if multiple threads are waiting,
+the longest-waiting thread is granted the lock next. However,
+fairness can lead to lower throughput due to the overhead of maintaining the order.
+Non-fair locks, in contrast, allow threads to “cut in line,” potentially offering better performance
+but at the risk of some threads waiting indefinitely if others frequently acquire the lock.
+
+Handle Thread Interruption Properly
+...................................
+Respect the interrupted status of threads.
+When catching InterruptedException, restore the interrupted status by calling Thread.currentThread().interrupt().
+
+ReentrantLock: Offers more control over locking mechanisms, including the ability to interrupt and time out.
+public class BankAccount {
+    private int balance = 100;
+    private final Lock fairLock = new ReentrantLock(true);
+
+    public void withdraw(int amount) {
+        try {
+            if (fairLock.tryLock(1000, TimeUnit.MILLISECONDS)) {
+                if (balance >= amount) {
+                    try {
+                        Thread.sleep(3000); // Simulate time taken to process the withdrawal
+                        balance -= amount;
+                    } catch (Exception e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        fairLock.unlock();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+Semaphore: Used to control access to a fixed number of resources.
+Real-life Example: Managing Database Connections
+                   In web servers, semaphores can be used to throttle incoming requests to prevent overload and maintain system stability.
+import java.util.concurrent.Semaphore;
+public class DatabaseConnectionPool {
+    private final Semaphore semaphore;
+    public DatabaseConnectionPool(int maxConnections) {
+        semaphore = new Semaphore(maxConnections, true); // Allows 3 permits
+    }
+    public void connect() {
+        try {
+            semaphore.acquire();
+            // Simulate database connection usage
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            semaphore.release();
+        }
+    }
+}
+a semaphore is used to manage access to a resource, allowing only three threads to access it concurrently.
+
+
+
+High-Level Concurrency Utilities
+CountDownLatch: Allows one or more threads to wait until a set of operations being performed by other threads completes.
+import java.util.concurrent.CountDownLatch;
+
+public class CountDownLatchExample {
+    private static final int N_TASKS = 3;
+    public static void main(String[] args) {
+        CountDownLatch latch = new CountDownLatch(N_TASKS);
+        for (int i = 0; i < N_TASKS; i++) {
+            new Thread(new Task(latch)).start();
+        }
+        try {
+            latch.await(); // Main thread waits until all tasks are done
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        System.out.println("All tasks completed.");
+    }
+}
+class Task implements Runnable {
+    private final CountDownLatch latch;
+    public Task(CountDownLatch latch) {
+        this.latch = latch;
+    }
+    @Override
+    public void run() {
+        System.out.println("Task executed by " + Thread.currentThread().getName());
+        latch.countDown(); // Decrement the count of the latch
+    }
+}
+In this example, the CountDownLatch ensures that the main thread waits until all tasks have completed before proceeding.
+
+CyclicBarrier: Allows a set of threads to all wait for each other to reach a common barrier point.
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
+
+public class CyclicBarrierExample {
+    private static final int N_TASKS = 3;
+    private static final CyclicBarrier barrier = new CyclicBarrier(N_TASKS, () -> System.out.println("All tasks are done!"));
+    public static void main(String[] args) {
+        for (int i = 0; i < N_TASKS; i++) {
+            new Thread(new Task(barrier)).start();
+        }
+    }
+}
+class Task implements Runnable {
+    private final CyclicBarrier barrier;
+    public Task(CyclicBarrier barrier) {
+        this.barrier = barrier;
+    }
+    @Override
+    public void run() {
+        System.out.println("Task executed by " + Thread.currentThread().getName());
+        try {
+            barrier.await(); // Wait for all threads to reach this point
+        } catch (InterruptedException | BrokenBarrierException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
+In this example, the CyclicBarrier ensures that all tasks wait for each other to reach a common barrier point before proceeding.
+
+
+In a multi-core environment, Java’s multithreading can take full advantage of the available cores.
+executor.shutdown();
+try {
+    if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+    }
+} catch (InterruptedException e) {
+    executor.shutdownNow();
+}
+
+Runtime.getRuntime().availableProcessors()
+
+@Configuration
+@EnableAsync
+public class AsyncConfig implements AsyncConfigurer {
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(50);
+        executor.setQueueCapacity(500);
+        executor.initialize();
+        return executor;
+    }
+}
+    @Async
+    public CompletableFuture<String> fetchMarketData(String source) {
+        try {
+            Thread.sleep((long) (Math.random() * 3000)); // Simulate variable API call latency
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return CompletableFuture.completedFuture("Market data from " + source);
+    }
+
+
+BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+queue.put("Task 1");
+String task = queue.take();
+
+
+Exclude Unneeded Transitive Dependencies
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+    <exclusions>
+        <exclusion>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-logging</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+
+
+mvn archetype:generate -DgroupId=com.ravan
+       -DartifactId=spring-boot-multi-module
+       -DarchetypeArtifactId=maven-archetype-quickstart
+       -DinteractiveMode=false
+
+
+Retry Pattern in Resilience4j:
+.....................................................
+Configurable Retry Attempts: You can configure how many times an operation should be retried before failing completely.
+Wait Interval Between Retries: It allows you to specify the time delay between consecutive retry attempts.
+Backoff Strategy: You can implement different backoff strategies (e.g., fixed or exponential backoff) to avoid overwhelming the system during retries.
+Retry on Specific Exceptions: You can configure which types of exceptions should trigger retries.
+Result-Based Retry: It allows retries based on the result of an operation (e.g., retry only if the response is not as expected).
+Event Publishing: You can monitor retry attempts through events like onRetry, onSuccess, onError, and onCompletion.
+
+
+https://bootcamptoprod.com/spring-boot-resilience4j-retry/
+
+resilience4j:
+  circuitbreaker:
+    instances:
+     healthProvider:
+        register-health-indicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 2
+        permittedNumberOfCallsInHalfOpenState: 2
+        waitDurationInOpenState: 2s
+        failureRateThreshold: 50
+        ignore-exceptions:
+          - java.lang.Throwable
+          - java.lang.Exception
+          - java.lang.RuntimeException
+        ignore-exception-predicate: java.lang.Throwable::getMessage
+        minimum-number-of-calls: 2
+        slow-call-duration-threshold:
+          seconds: 1
+        slow-call-rate-threshold: 0.5
+        record-failure-predicate: java.lang.Throwable::getMessage
+        record-result-predicate: java.lang.Throwable::getMessage
+        max-wait-duration-in-half-open-state:
+          seconds: 10
+        wait-duration-in-open-state:
+          seconds: 2
+        randomized-wait-factor: 0.5
+        exponential-max-wait-duration-in-open-state:
+          seconds: 2
+        exponential-backoff-multiplier: 2
+        allow-health-indicator-to-fail: true
+        automatic-transition-from-open-to-half-open-enabled: true
+        writable-stack-trace-enabled: true
+        event-consumer-buffer-size: 100
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - java.net.ConnectException
+
+The parameters we defined above can also be configured by creating a class.
+
+@Bean
+    public  CircuitBreakerConfig createCircuitBreakerConfig() {
+        return CircuitBreakerConfig.custom()
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(2)
+                .permittedNumberOfCallsInHalfOpenState(2)
+                .waitDurationInOpenState(Duration.ofSeconds(2))
+                .failureRateThreshold(50.0f)
+                .ignoreExceptions(Throwable.class, Exception.class, RuntimeException.class)
+                .ignoreException(e -> e.getMessage() != null)
+                .minimumNumberOfCalls(2)
+                .slowCallDurationThreshold(Duration.ofSeconds(1))
+                .slowCallRateThreshold(50.0f)
+                .recordResult(result -> result != null)
+                .maxWaitDurationInHalfOpenState(Duration.ofSeconds(10))
+                .waitDurationInOpenState(Duration.ofSeconds(2))
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                .writableStackTraceEnabled(true)
+                .build();
+    }
+
+
+HttpClient 5 with support for HTTP/2 and asynchronous response processing
+while (!Thread.currentThread().isInterrupted()) {
+}
+
+
+
+
+
+
+
+
+

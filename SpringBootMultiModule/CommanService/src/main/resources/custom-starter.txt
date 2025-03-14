@@ -1,0 +1,140 @@
+
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-dependencies</artifactId>
+            <version>3.0.0</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-configuration-processor</artifactId>
+	 <version>3.0.2</version>
+    <optional>true</optional>
+</dependency>
+<!-- Spring Boot Auto Configuration -->
+pom.xml
+.................
+ <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+      <version>3.0.2</version>
+</dependency>
+
+in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+Add the configuration class name to the file. Each line contains a fully qualified name of a configuration class.
+public enum SmsTypeEnum {
+    ALI_CLOUD("ali"),
+    TX_CLOUD("tx"),
+    YMX_CLOUD("ymx");
+
+    private String type;
+    SmsTypeEnum(String ymx) {}
+}
+@ConfigurationProperties(prefix = "sms.server.achieve")
+public class SmsProperties {
+    private String type;
+
+    public String getType() {
+        if(type == null || "".equals(type)){
+            type = SmsTypeEnum.ALI_YUN.name();
+        }
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+}
+public interface SmsService {
+    String send(String fromPhone,String toPhone,String content);
+}
+
+@Service("ali")
+public class AliCloudSmsServiceImpl implements SmsService {
+    @Override
+    public String send(String fromPhone, String toPhone, String content) {
+        return "success";
+    }
+}
+
+@Service("tx")
+public class TxCloudSmsServiceImpl implements SmsService {
+    @Override
+    public String send(String fromPhone, String toPhone, String content) {
+        return "success";
+    }
+}
+
+@Service("ymx")
+public class YmxCloudSmsServiceImpl implements SmsService {
+    @Override
+    public String send(String fromPhone, String toPhone, String content) {
+        return "success";
+    }
+}
+
+public class SmsTemplate {
+    @Autowired
+    private SmsProperties smsProperties;
+
+    @Autowired
+    private ApplicationContext context;
+
+    public String send(String fromPhone,String toPhone,String content){
+        String type = smsProperties.getType();
+        SmsService smsService = (SmsService)context.getBean(type);
+        return smsService.send(fromPhone,toPhone,content);
+    }
+}
+
+@AutoConfiguration
+@ConditionalOnClass(SmsTemplate.class)
+@EnableConfigurationProperties(value = SmsProperties.class)
+public class SmsAutoConfiguration {
+
+    @Bean
+    @ConditionalOnMissingBean //@ConditionalOnMissingBean(SmsTemplate.class)
+    public SmsTemplate smsTemplate(){
+        return new SmsTemplate();
+    }
+
+}
+META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports
+# Auto Configure
+com.ravan.config.SmsAutoConfiguration
+
+application.yml
+
+
+Create a new project. Please note that it must be springboot 3.x or above.
+        <dependency>
+            <groupId>com.ravan</groupId>
+            <artifactId>sms-spring-boot-starter</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+
+application.yml
+..........................
+sms.server.achieve.type=tx
+
+@RestController
+@RequestMapping("/spring-test")
+public class TestController {
+
+    @Autowired
+    private SmsTemplate smsTemplate;
+
+    @RequestMapping("/sms")
+    public String sms(){
+        String fromPhone = "15522834580";
+        String toPhone = "13820345839";
+        String content = "over！";
+        return smsTemplate.send(fromPhone,toPhone,content);
+    }
+
+}

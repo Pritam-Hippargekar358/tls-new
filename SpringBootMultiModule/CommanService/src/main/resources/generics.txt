@@ -1,0 +1,56 @@
+protected Object clone();
+public class Person {
+    @Override
+    public Person clone() {
+        return (Person) super.clone();
+    }
+
+}
+class Base { ... }
+class Derived extends Base { ... }
+
+
+
+
+
+
+
+
+Covariance
+.......................................
+ A is a subtype of B
+ K<A> is a subtype of K<B>
+This might mean that List in Java is not covariant.
+Java generics are not covariant
+
+Although Java arrays and collections do not directly support contravariance, we can achieve a similar effect using wildcard types in method parameters.
+
+Fortunately, there is a way to achieve covariant with Java lists.
+We can use a <? extends T> wildcard which means that it will accept any subtype of T.
+
+List<Dog> dogs = new ArrayList<>();
+List<? extends Animal> animals = dogs;
+public void processAnimals(List<? extends Animal> animals) {}
+
+
+Contravariance
+.......................................
+A is a subtype of B (the same as in covariance)
+K<B> is a subtype of K<A> (opposite to covariance)
+
+List<Animal> animals = new ArrayList<>();
+List<? super Dog> dogs = animals;
+public void processDogs(List<? super Dog> dogs) {}
+
+
+
+Invariance
+.......................................
+A is a subtype of B (the same as in covariance and contravariance)
+K<A> is not a subtype of K<B> and K<B> is not a subtype of K<A>
+
+List<Dog> dogs = new ArrayList<>();
+List<Animal> animals = dogs; // compilation error
+
+List<Animal> animals = new ArrayList<>();
+List<Dog> dogs = animals; // compilation error
