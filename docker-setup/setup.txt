@@ -1,0 +1,208 @@
+docker network create private_network
+docker volume create pgdata
+
+docker exec -it 3e615f517ffe psql -U postgres vcipintegration
+
+docker exec -it [CONTAINER ID] psql -U vcipIntegration vcipIntegration
+List the databases:
+\l
+
+Next, connect the the database:
+\c mydatabase
+
+List the tables
+\dt
+
+Check the data
+SELECT * FROM users;
+
+OR
+docker exec -it postgres_container /bin/bash
+su - postgres
+psql       =====error — you might face an error while using psql command saying(psql: error: connection to server on socket "/var/run/postgresql/.s.PGSQL.5432" failed:)
+Here the error you are facing is because you have installed postgres on your local system. Search for services and stop the service of postgres
+Alternative Approach (Recommended):
+psql -h localhost -p 5432 -U postgres -W
+\du
+CREATE ROLE docker_user with login SUPERUSER PASSWORD ‘docker_user’;
+ALTER USER docker_user WITH CREATEDB CREATEROLE;
+
+Now you can quit from database connection using psql command \q and then type exit to logged out postgres user. 
+And then type another time exit to leave out from docker container.
+
+ 
+docker-compose up -d
+docker-compose up -d --build
+You can manage your PostgreSQL database using any PostgreSQL client, such as pgAdmin, DBeaver, or the psql CLI. 
+
+Host: localhost (or the Docker host IP)
+Port: 5432
+Username: postgres
+Password: mysecretpassword
+
+Data is saved in a container even if it is stopped.
+Now we get to the question, what would happen if we deleted the whole container, 
+and then create it again based on the same image
+
+Every database needs to store database files somewhere physically on the disk. 
+-v ./postgres-data:/var/lib/postgresql/data
+-v pgdata:/var/lib/postgresql/data
+Instead of the previously used /var/lib/postgresql/data directory in the container 
+now we are mapping it to /postgres-data directory in our project. 
+when we delete the whole container, we will have saved database files in our project directory.
+
+
+Why Are Docker Volumes Important?
+1. Data Persistence: Volumes ensure that critical data persists across container restarts and updates. This is vital for databases, file storage, and other applications where data integrity is paramount.
+2. Sharing Data Between Containers: Volumes facilitate sharing data between multiple containers, enabling collaboration and communication within a Dockerized application.
+3. Backup and Restore: With volumes, you can easily back up important data and restore it when needed, enhancing the resilience of your Dockerized applications.
+
+
+Example 2: Sharing Data Between Containers
+Let’s say you have an application that consists of two Docker containers: one for the frontend and another for the backend. You need to share a configuration file between these containers.
+
+docker run -d --name backend -v config:/app/config backend:latest
+docker run -d --name frontend --link backend -v config:/app/config frontend:latest
+
+In this example:
+- We create a Docker volume named config.
+- We run the backend container and mount the config volume to the /app/config directory.
+- We run the frontend container, linking it to the backend container and mounting the same config volume. This allows both containers to access the shared configuration file.
+
+
+$ docker compose --profile prod up will start both app and db services.
+
+add healthcheck under db service
+add condition under app
+condition: service_healthy
+
+healthcheck:
+test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+interval: 10s
+timeout: 5s
+retries: 5
+
+
+
+
+
+# Access the PostgreSQL prompt:
+root@32e33cbec30c:/# psql -U postgres
+
+# Create a new user named 'admin'
+postgres=# CREATE USER admin PASSWORD 'admin' SUPERUSER;
+
+# Create a new database owned by 'admin'
+postgres=# CREATE DATABASE test OWNER admin;
+
+# Connect to the 'test' database
+postgres=# \c test admin
+
+# Define and create a table to store stock data
+test=# CREATE TABLE stock (
+id serial PRIMARY KEY,
+name VARCHAR(32),
+symbol VARCHAR(32),
+date date,
+close_price float,
+high_price float,
+low_price float
+);
+
+# Confirm that the table has been created
+test=# \d stock
+
+
+
+1.Save Data to a Docker Volume
+Using Docker’s built-in volume management
+# create a New Docker Volume
+$ docker volume create pgdata
+-v pgdata:/var/lib/postgresql/data
+-v /opt/workspace/nerdcode/docker/data/medium:/var/lib/postgresql/data:rw
+To find out where the Docker Volume is located:
+$ docker volume list
+$ docker volume inspect pgdata
+$ docker volume --rm pgdata
+
+2. Save Data to your Local Machine
+For those who prefer not to use Docker’s volume system and would rather map the data directly to a folder on the host machine
+# create a directory on Host
+$ mkdir pgdata
+-v ~/pgdata:/var/lib/postgresql/data 
+
+# inspect local directory
+$ cd pgdata
+$ ls -l
+
+
+Web Service:
+volumes: - .:/app: This is a bind mount. The current directory (represented by .) on the host is mounted to /app inside the web container. This is useful for development since any code change on the host is immediately reflected inside the container.
+
+my-postgres Service:
+volumes: - pgdata:/var/lib/postgresql/data: This configures a named volume. The volume named "pgdata" (which we created earlier) is mounted to /var/lib/postgresql/data inside the PostgreSQL container. This directory is where PostgreSQL stores its data. By mounting a named volume to this path, we ensure that the data persists across container restarts.
+
+
+volumes:
+    - ./migrations/1_db_init.up.sql:/docker-entrypoint-initdb.d/init.sql
+This configuration is useful for setting up a PostgreSQL database with a predefined schema or initial data using the SQL script (`1_db_init.up.sql`).
+
+
+
+Copy files from the container to your local directory by using the following commands:
+..............................................................................................
+docker cp 916fc79719fc:/var/lib/postgresql/data/pg_hba.conf /opt/workspace/nerdcode/docker/online
+and
+docker cp 916fc79719fc:/var/lib/postgresql/data/postgresql.conf /opt/workspace/nerdcode/docker/online
+
+Change the pg_hba.conf file by adding the following 2 lines at the end of the file to allow the database to accept connections from any IP addresses:
+host all all 0.0.0.0/0 md5
+host all all ::/0 md5
+
+Change the posrgresql.conf file by locating the parameter called listen_addresses to listen to any address which might try and access this database
+listen_addresses = ‘*’
+Please Note: On this posrgresql.conf file, you can also change memory settings, number of connections, and logging mechanism.
+
+pg_hba.conf /var/lib/postgresql/data/
+postgresql.conf /var/lib/postgresql/data/
+
+Types of Docker Volumes
+1) Anonymous Volumes: They are typically used to store temporary or transient data generated by a container during its lifecycle.
+2) Named Volumes: allowing containers to independently share data across. Named volumes are generally recommended for the production environment.
+
+In addition to these, there are other classes of Docker volumes:
+/////////////////////////////////////////////////////////////////////
+Remote Volumes: Created and managed on a remote host. This enables sharing of data between different Docker hosts.
+Host Volumes: Created and managed on the host machine.
+Third-Party Volume Plugins: Enables the use of external storage systems like cloud storage or distributed file systems as backing storage for Docker volumes.
+
+Volumes are independent of the container’s lifecycle and can be created, managed, and shared across multiple containers.
+Persistent Data
+Data Sharing
+Separation of Concerns
+Backup and Recovery
+Bind mounts are tightly coupled to the host file system and do not have the same features and flexibility as Docker volumes.
+Bind mounts are useful when you need to directly access files or directories from the host in the container.
+
+
+
+
+https://semaphoreci.medium.com/docker-volumes-efficient-data-management-in-containerized-environments-1366d36378e5
+Docker volumes provide a reliable and isolated way to store application data like configurations, uploads, and logs. This allows easy data sharing and collaboration between containers. For Example:
+docker run -d --name appy -v uploads:/app/uploads myapp:v2
+docker run -d --name app1 -v logs:/app/logs myapp:v3
+docker run -d --name app2 -v logs:/app/logs myapp:v3
+
+
+
+In conclusion, docker-compose stop is useful when you simply want to stop containers without losing persistent data or associated configurations. This allows you to restart containers at a later date without having to rebuild the entire environment.
+Using docker-compose down can be dangerous, and you need to understand the consequences. It is appropriate when you need to completely clean up your Docker environment. For example, when you want to delete a local database or clean up a project.
+docker-compose down <service_name …>
+docker-compose down -v
+docker-compose down --remove-orphans
+docker-compose down --rmi all
+docker-compose down --rmi local
+docker-compose down --timeout <seconds>
+Containers can be restarted later using the docker-compose start command.
+Thedocker-compose rm command removes stopped service containers but doesn't affect networks, volumes, or images. 
+
